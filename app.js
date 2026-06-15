@@ -543,7 +543,12 @@ const Luna = (() => {
 
   // ===== WAKE WORD DETECTOR =====
   const wakeWord = {
-    phrases: ['hey luna', 'a luna', 'hey loona', 'hey luma', 'eluna', 'hey leuna'],
+    // Broad set of phonetic variations browsers may transcribe
+    phrases: [
+      'hey luna', 'hey loona', 'hey luna', 'hey luma', 'hey leuna',
+      'a luna', 'eluna', 'he luna', 'hey luna', 'hayluna',
+      'hey lunah', 'hey louna', 'hey lena', 'hey lyuna',
+    ],
 
     init() {
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return;
@@ -552,42 +557,60 @@ const Luna = (() => {
       state.wakeWordRecognition.continuous = true;
       state.wakeWordRecognition.interimResults = true;
       state.wakeWordRecognition.lang = 'en-US';
+      state.wakeWordRecognition.maxAlternatives = 5;
 
       state.wakeWordRecognition.onresult = (event) => {
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript.toLowerCase().trim();
-          if (wakeWord.matches(transcript)) {
-            wakeWord.stop();
-            Luna.ui.showListening();
-            return;
+          // Check all alternatives the recognizer provides
+          for (let alt = 0; alt < event.results[i].length; alt++) {
+            const transcript = event.results[i][alt].transcript.toLowerCase().trim();
+            if (wakeWord.matches(transcript)) {
+              wakeWord.stopAndThen(() => {
+                Luna.ui.showListening();
+              });
+              return;
+            }
           }
         }
       };
 
       state.wakeWordRecognition.onerror = (event) => {
-        if (event.error === 'no-speech' || event.error === 'aborted') {
-          // Restart silently
+        state.isWakeWordListening = false;
+        if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'network') {
           if (state.phase === 'standby' && state.wakeWordEnabled) {
-            setTimeout(() => wakeWord.start(), 300);
+            setTimeout(() => wakeWord.start(), 500);
           }
         }
       };
 
       state.wakeWordRecognition.onend = () => {
         state.isWakeWordListening = false;
+        // Fire pending callback if waiting for stop
+        if (wakeWord._onStopCallback) {
+          const cb = wakeWord._onStopCallback;
+          wakeWord._onStopCallback = null;
+          cb();
+          return;
+        }
         // Auto-restart if still in standby
         if (state.phase === 'standby' && state.wakeWordEnabled) {
-          setTimeout(() => wakeWord.start(), 300);
+          setTimeout(() => wakeWord.start(), 500);
         }
       };
     },
 
+    _onStopCallback: null,
+
     matches(transcript) {
+      // Exact phrase match
       for (const phrase of wakeWord.phrases) {
         if (transcript.includes(phrase)) return true;
       }
-      // Also match just "luna" if it's the only word
-      if (transcript === 'luna' || transcript === 'loona') return true;
+      // Match "luna" anywhere in speech (with word boundary check)
+      if (/\bluna\b/i.test(transcript) || /\bloona\b/i.test(transcript)) return true;
+      // Fuzzy: remove spaces and check
+      const compact = transcript.replace(/\s+/g, '');
+      if (compact.includes('heyluna') || compact.includes('hayluna') || compact.includes('heluna')) return true;
       return false;
     },
 
@@ -597,14 +620,32 @@ const Luna = (() => {
         state.wakeWordRecognition.start();
         state.isWakeWordListening = true;
       } catch (e) {
-        // Already started or other error
+        // Already started — try aborting and restarting
+        try { state.wakeWordRecognition.abort(); } catch (e2) { /* ignore */ }
+        state.isWakeWordListening = false;
+        setTimeout(() => wakeWord.start(), 500);
       }
     },
 
     stop() {
+      wakeWord._onStopCallback = null;
       if (state.wakeWordRecognition && state.isWakeWordListening) {
-        try { state.wakeWordRecognition.stop(); } catch (e) { /* ignore */ }
+        try { state.wakeWordRecognition.abort(); } catch (e) { /* ignore */ }
         state.isWakeWordListening = false;
+      }
+    },
+
+    // Stop and wait for the recognition to fully end before calling callback
+    stopAndThen(callback) {
+      if (!state.isWakeWordListening) {
+        callback();
+        return;
+      }
+      wakeWord._onStopCallback = callback;
+      try { state.wakeWordRecognition.stop(); } catch (e) {
+        wakeWord._onStopCallback = null;
+        state.isWakeWordListening = false;
+        callback();
       }
     },
   };
@@ -640,13 +681,18 @@ const Luna = (() => {
       };
 
       state.recognition.onerror = (event) => {
-        console.error('Speech error:', event.error);
+        console.warn('Speech error:', event.error);
         if (event.error === 'no-speech') {
           const statusEl = state.phase === 'urgent'
             ? document.getElementById('urgent-status')
             : document.getElementById('overlay-status');
           if (statusEl) statusEl.textContent = 'No speech detected';
           setTimeout(() => Luna.ui.dismiss(), 2000);
+        } else if (event.error === 'aborted' || event.error === 'network') {
+          // Recognition was interrupted — retry if still in listening phase
+          if (state.phase === 'listening' || state.phase === 'urgent') {
+            setTimeout(() => speech.startListening(1), 300);
+          }
         }
       };
 
@@ -675,28 +721,46 @@ const Luna = (() => {
       loadVoices();
     },
 
-    startListening() {
+    startListening(retryCount) {
       if (!state.recognition) return;
-      try {
-        state.recognition.start();
-        state.isRecognizing = true;
-      } catch (e) {
-        console.error('Recognition start error:', e);
-      }
+      const attempt = retryCount || 0;
 
-      // Auto-dismiss after 5 seconds of no speech
-      if (state.autoDismissTimer) clearTimeout(state.autoDismissTimer);
-      state.autoDismissTimer = setTimeout(() => {
-        if (state.phase === 'listening' || state.phase === 'urgent') {
-          const transcriptEl = document.getElementById('overlay-transcript');
-          if (transcriptEl && !transcriptEl.textContent.trim()) {
+      // Ensure wake word recognition is fully stopped first
+      wakeWord.stop();
+
+      // Small delay to let the previous recognition session release the mic
+      const delay = attempt === 0 ? 250 : 500;
+      setTimeout(() => {
+        try {
+          state.recognition.start();
+          state.isRecognizing = true;
+        } catch (e) {
+          console.warn('Recognition start error (attempt ' + attempt + '):', e);
+          // Retry up to 3 times with increasing delay
+          if (attempt < 3) {
+            setTimeout(() => speech.startListening(attempt + 1), 500);
+          } else {
+            console.error('Failed to start speech recognition after 3 retries');
             const statusEl = document.getElementById('overlay-status');
-            if (statusEl) statusEl.textContent = 'No speech detected';
-            audio.playChime('click');
-            setTimeout(() => Luna.ui.dismiss(), 1500);
+            if (statusEl) statusEl.textContent = 'Mic busy — try again';
           }
+          return;
         }
-      }, 5000);
+
+        // Auto-dismiss after 7 seconds of no speech (extended from 5)
+        if (state.autoDismissTimer) clearTimeout(state.autoDismissTimer);
+        state.autoDismissTimer = setTimeout(() => {
+          if (state.phase === 'listening' || state.phase === 'urgent') {
+            const transcriptEl = document.getElementById('overlay-transcript');
+            if (transcriptEl && !transcriptEl.textContent.trim()) {
+              const statusEl = document.getElementById('overlay-status');
+              if (statusEl) statusEl.textContent = 'No speech detected';
+              audio.playChime('click');
+              setTimeout(() => Luna.ui.dismiss(), 1500);
+            }
+          }
+        }, 7000);
+      }, delay);
     },
 
     stopListening() {
