@@ -128,7 +128,21 @@
             <path d="M60 5 A55 55 0 1 1 60 115 A40 40 0 1 0 60 5" fill="#7BA7D4" opacity="0.3" class="crescent-path"/>
           </svg>
         </div>
-        <p class="standby-text">Clap or say "Hey Luna" to start</p>
+        <p class="standby-text" id="standby-text">Clap or say "Hey Luna" to start</p>
+        <!-- Quick text input on standby -->
+        <div class="standby-input-area" id="standby-input-area" style="display:none;">
+          <form onsubmit="Luna.ui.submitStandbyQuery(event)">
+            <div class="text-input-row">
+              <input type="text" id="standby-query-input" class="text-query-input" placeholder="Or type your question here…" autocomplete="off" />
+              <button type="submit" class="btn-send" title="Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                  <line x1="22" y1="2" x2="11" y2="13"/>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+              </button>
+            </div>
+          </form>
+        </div>
         <div class="volume-meter standby-meter" id="standby-volume-meter">
           <div class="volume-bar" id="standby-volume-bar"></div>
         </div>
@@ -179,6 +193,30 @@
         </div>
         <p class="overlay-status" id="overlay-status">Listening…</p>
         <p class="overlay-transcript" id="overlay-transcript"></p>
+
+        <!-- Text input fallback (shown when speech recognition unavailable) -->
+        <div class="text-input-area" id="text-input-area" style="display:none;">
+          <form id="text-query-form" onsubmit="Luna.ui.submitTextQuery(event)">
+            <div class="text-input-row">
+              <input type="text" id="text-query-input" class="text-query-input" placeholder="Type your question…" autocomplete="off" autofocus />
+              <button type="submit" class="btn-send" title="Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                  <line x1="22" y1="2" x2="11" y2="13"/>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+              </button>
+            </div>
+          </form>
+          <button class="btn-mic-retry" id="btn-mic-retry" onclick="Luna.ui.retryVoice()" title="Try voice input">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+            Try voice input
+          </button>
+        </div>
 
         <!-- Response area -->
         <div class="response-area" id="response-area" style="display:none;">

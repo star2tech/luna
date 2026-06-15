@@ -44,6 +44,8 @@ const Luna = (() => {
     wakeWordEnabled: true,
     geminiApiKey: localStorage.getItem('luna_gemini_key') || '',
     useAI: true,
+    speechAvailable: false,
+    isElectron: !!(window.electronAPI || (typeof process !== 'undefined' && process.versions && process.versions.electron)),
   };
 
   // ===== KNOWLEDGE DATABASE =====
@@ -758,9 +760,12 @@ const Luna = (() => {
 
   // ===== SPEECH ENGINE =====
   const speech = {
+    _speechTestFailed: false,
+
     init() {
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
         console.warn('Speech recognition not supported');
+        speech._onSpeechUnavailable();
         return;
       }
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -770,6 +775,12 @@ const Luna = (() => {
       state.recognition.lang = 'en-US';
 
       state.recognition.onresult = (event) => {
+        // Speech works! Mark as available
+        if (!state.speechAvailable) {
+          state.speechAvailable = true;
+          speech._hideTextFallback();
+        }
+
         let transcript = '';
         let isFinal = false;
         for (let i = 0; i < event.results.length; i++) {
@@ -788,6 +799,11 @@ const Luna = (() => {
 
       state.recognition.onerror = (event) => {
         console.warn('Speech error:', event.error);
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          // Speech recognition blocked (common in Electron)
+          speech._onSpeechUnavailable();
+          return;
+        }
         if (event.error === 'no-speech') {
           const statusEl = state.phase === 'urgent'
             ? document.getElementById('urgent-status')
@@ -795,6 +811,11 @@ const Luna = (() => {
           if (statusEl) statusEl.textContent = 'No speech detected';
           setTimeout(() => Luna.ui.dismiss(), 2000);
         } else if (event.error === 'aborted' || event.error === 'network') {
+          if (speech._speechTestFailed) {
+            // Confirm speech is unavailable after test failure
+            speech._onSpeechUnavailable();
+            return;
+          }
           // Recognition was interrupted — retry if still in listening phase
           if (state.phase === 'listening' || state.phase === 'urgent') {
             setTimeout(() => speech.startListening(1), 300);
@@ -805,6 +826,9 @@ const Luna = (() => {
       state.recognition.onend = () => {
         state.isRecognizing = false;
       };
+
+      // Test if speech recognition actually works (Electron often has API but it silently fails)
+      speech._testSpeechAvailability();
 
       // Populate voice selector
       const loadVoices = () => {
@@ -827,8 +851,95 @@ const Luna = (() => {
       loadVoices();
     },
 
-    startListening(retryCount) {
+    _testSpeechAvailability() {
       if (!state.recognition) return;
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const testRec = new SpeechRecognition();
+      testRec.continuous = false;
+      testRec.interimResults = false;
+
+      const testTimeout = setTimeout(() => {
+        // If no error and no result after 3s, assume it works (browser is waiting for speech)
+        try { testRec.abort(); } catch (e) { /* ignore */ }
+        state.speechAvailable = true;
+      }, 3000);
+
+      testRec.onerror = (event) => {
+        clearTimeout(testTimeout);
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed' || event.error === 'network') {
+          speech._speechTestFailed = true;
+          speech._onSpeechUnavailable();
+        } else {
+          // no-speech or aborted = the API itself works fine
+          state.speechAvailable = true;
+        }
+        try { testRec.abort(); } catch (e) { /* ignore */ }
+      };
+
+      testRec.onend = () => {
+        clearTimeout(testTimeout);
+      };
+
+      try {
+        testRec.start();
+        // Quick abort — we just want to see if start() throws or fires an error
+        setTimeout(() => {
+          if (!speech._speechTestFailed) {
+            state.speechAvailable = true;
+          }
+          try { testRec.abort(); } catch (e) { /* ignore */ }
+        }, 1500);
+      } catch (e) {
+        clearTimeout(testTimeout);
+        speech._speechTestFailed = true;
+        speech._onSpeechUnavailable();
+      }
+    },
+
+    _onSpeechUnavailable() {
+      state.speechAvailable = false;
+      console.warn('Speech recognition unavailable — enabling text input fallback');
+
+      // Show text input on standby screen
+      const standbyInput = document.getElementById('standby-input-area');
+      if (standbyInput) standbyInput.style.display = 'block';
+
+      // Update standby text
+      const standbyText = document.getElementById('standby-text');
+      if (standbyText) standbyText.textContent = 'Clap to start, or type below';
+
+      // Disable wake word since it needs speech recognition too
+      state.wakeWordEnabled = false;
+    },
+
+    _showTextFallback() {
+      const textArea = document.getElementById('text-input-area');
+      const transcriptEl = document.getElementById('overlay-transcript');
+      const statusEl = document.getElementById('overlay-status');
+      if (textArea) {
+        textArea.style.display = 'block';
+        const input = document.getElementById('text-query-input');
+        if (input) {
+          input.value = '';
+          setTimeout(() => input.focus(), 100);
+        }
+      }
+      if (transcriptEl) transcriptEl.textContent = '';
+      if (statusEl) statusEl.textContent = 'Voice unavailable — type your question';
+    },
+
+    _hideTextFallback() {
+      const textArea = document.getElementById('text-input-area');
+      if (textArea) textArea.style.display = 'none';
+    },
+
+    startListening(retryCount) {
+      // If speech is unavailable, show text input immediately
+      if (!state.speechAvailable || !state.recognition) {
+        speech._showTextFallback();
+        return;
+      }
+
       const attempt = retryCount || 0;
 
       // Ensure wake word recognition is fully stopped first
@@ -847,8 +958,8 @@ const Luna = (() => {
             setTimeout(() => speech.startListening(attempt + 1), 500);
           } else {
             console.error('Failed to start speech recognition after 3 retries');
-            const statusEl = document.getElementById('overlay-status');
-            if (statusEl) statusEl.textContent = 'Mic busy — try again';
+            // Fall back to text input
+            speech._showTextFallback();
           }
           return;
         }
@@ -1119,6 +1230,8 @@ const Luna = (() => {
       if (transcriptEl) transcriptEl.textContent = '';
       if (responseArea) responseArea.style.display = 'none';
       if (timerDisplay) timerDisplay.style.display = 'none';
+      // Reset text input area visibility — startListening will show it if needed
+      speech._hideTextFallback();
 
       audio.playChime(state.chimeType);
       speech.startListening();
@@ -1161,6 +1274,48 @@ const Luna = (() => {
             statusEl.textContent = state.geminiApiKey ? 'Connected' : 'Not set';
             statusEl.className = 'gemini-status ' + (state.geminiApiKey ? 'connected' : '');
           }
+        }
+      }
+    },
+
+    submitTextQuery(event) {
+      event.preventDefault();
+      const input = document.getElementById('text-query-input');
+      if (!input || !input.value.trim()) return;
+      const query = input.value.trim();
+      input.value = '';
+      speech.processQuery(query);
+    },
+
+    submitStandbyQuery(event) {
+      event.preventDefault();
+      const input = document.getElementById('standby-query-input');
+      if (!input || !input.value.trim()) return;
+      const query = input.value.trim();
+      input.value = '';
+      // Show listening overlay and process query directly
+      state.phase = 'listening';
+      wakeWord.stop();
+      ui.showState('listening-overlay');
+      const statusEl = document.getElementById('overlay-status');
+      if (statusEl) statusEl.textContent = 'Processing…';
+      // Show text input in the overlay too
+      speech._showTextFallback();
+      speech.processQuery(query);
+    },
+
+    retryVoice() {
+      speech._hideTextFallback();
+      const statusEl = document.getElementById('overlay-status');
+      if (statusEl) statusEl.textContent = 'Listening…';
+      // Force-try speech recognition
+      if (state.recognition) {
+        wakeWord.stop();
+        try {
+          state.recognition.start();
+          state.isRecognizing = true;
+        } catch (e) {
+          speech._showTextFallback();
         }
       }
     },
