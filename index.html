@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Luna — Clap. Ask. Done.</title>
   <link rel="stylesheet" href="styles.css" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; media-src 'self'; script-src 'self' 'unsafe-inline'" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -86,7 +87,7 @@
           <div class="tut-card">
             <div class="tut-icon">👏</div>
             <h3>1. Clap</h3>
-            <p>A single clap activates Luna. Double-clap for urgent mode.</p>
+            <p>A single clap or say "Hey Luna" to activate. Double-clap for urgent mode.</p>
           </div>
           <div class="tut-card">
             <div class="tut-icon">🗣️</div>
@@ -127,13 +128,13 @@
             <path d="M60 5 A55 55 0 1 1 60 115 A40 40 0 1 0 60 5" fill="#7BA7D4" opacity="0.3" class="crescent-path"/>
           </svg>
         </div>
-        <p class="standby-text">Clap to start</p>
+        <p class="standby-text">Clap or say "Hey Luna" to start</p>
         <div class="volume-meter standby-meter" id="standby-volume-meter">
           <div class="volume-bar" id="standby-volume-bar"></div>
         </div>
         <div class="standby-status">
           <span class="status-dot"></span>
-          <span id="standby-status-text">Listening for claps…</span>
+          <span id="standby-status-text">Listening for claps &amp; voice…</span>
         </div>
       </div>
 
@@ -260,6 +261,13 @@
           </label>
         </div>
         <div class="setting-group">
+          <h3>Activation</h3>
+          <label class="setting-row">
+            <span>"Hey Luna" wake word</span>
+            <input type="checkbox" checked id="wakeword-toggle" onchange="Luna.settings.toggleWakeWord(this.checked)"/>
+          </label>
+        </div>
+        <div class="setting-group">
           <h3>Privacy</h3>
           <label class="setting-row">
             <span>Show query log</span>
@@ -279,5 +287,6 @@
   <!-- We'll generate chimes programmatically with Web Audio API -->
 
   <script src="app.js"></script>
+  <script src="electron-bridge.js"></script>
 </body>
 </html>

@@ -1,0 +1,57 @@
+{
+  "name": "luna",
+  "version": "1.0.0",
+  "description": "Luna — Clap-activated voice agent. Clap. Ask. Done.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "keywords": ["voice-assistant", "clap-detection", "electron", "speech-recognition"],
+  "author": "Luna Team",
+  "license": "MIT",
+  "dependencies": {
+    "electron": "^42.4.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.luna.app",
+    "productName": "Luna",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "electron-bridge.js",
+      "index.html",
+      "styles.css",
+      "app.js",
+      "assets/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "assets/icon.png",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "icon": "assets/icon.png",
+      "target": ["nsis", "portable"]
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "target": ["AppImage", "deb"],
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    }
+  }
+}
