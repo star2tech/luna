@@ -590,6 +590,72 @@ h2 {
   text-align: right;
 }
 
+.api-key-row {
+  flex-direction: column;
+  align-items: flex-start !important;
+  gap: 8px;
+}
+
+.api-key-input-wrap {
+  display: flex;
+  width: 100%;
+  gap: 6px;
+}
+
+.api-key-input-wrap input {
+  flex: 1;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.api-key-input-wrap input:focus {
+  border-color: var(--accent);
+}
+
+.api-key-input-wrap input::placeholder {
+  color: var(--text-dim);
+}
+
+.btn-toggle-vis {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 14px;
+}
+
+.setting-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 4px 0 8px 0;
+}
+
+.setting-hint a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.setting-hint a:hover {
+  text-decoration: underline;
+}
+
+.gemini-status {
+  color: var(--warning);
+}
+
+.gemini-status.connected {
+  color: var(--success);
+}
+
 .about-text {
   font-size: 12px;
   color: var(--text-dim);

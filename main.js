@@ -183,3 +183,47 @@ ipcMain.on('clap-detected', () => {
 ipcMain.on('show-notification', (event, { title, body }) => {
   new Notification({ title, body }).show();
 });
+
+// App launcher
+ipcMain.handle('launch-app', async (event, appInfo) => {
+  const { exec } = require('child_process');
+  const platform = process.platform;
+
+  let command;
+  if (typeof appInfo === 'object' && appInfo !== null) {
+    // appInfo has platform-specific names: { win, mac, linux }
+    if (platform === 'win32' && appInfo.win) {
+      command = `start "" "${appInfo.win}"`;
+    } else if (platform === 'darwin' && appInfo.mac) {
+      command = `open -a "${appInfo.mac}"`;
+    } else if (appInfo.linux) {
+      command = appInfo.linux;
+    }
+  }
+
+  if (!command && typeof appInfo === 'string') {
+    // Generic app name — try platform-appropriate open command
+    if (platform === 'win32') {
+      command = `start "" "${appInfo}"`;
+    } else if (platform === 'darwin') {
+      command = `open -a "${appInfo}"`;
+    } else {
+      command = appInfo;
+    }
+  }
+
+  if (!command) {
+    return { success: false, error: 'Unsupported platform or app not found' };
+  }
+
+  return new Promise((resolve) => {
+    exec(command, (error) => {
+      if (error) {
+        console.warn('App launch failed:', error.message);
+        resolve({ success: false, error: error.message });
+      } else {
+        resolve({ success: true });
+      }
+    });
+  });
+});
