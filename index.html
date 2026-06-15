@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Luna — Clap. Ask. Done.</title>
   <link rel="stylesheet" href="styles.css" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; media-src 'self'; script-src 'self' 'unsafe-inline'" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -279,5 +280,6 @@
   <!-- We'll generate chimes programmatically with Web Audio API -->
 
   <script src="app.js"></script>
+  <script src="electron-bridge.js"></script>
 </body>
 </html>
