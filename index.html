@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Luna — Clap. Ask. Done.</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- ========== ONBOARDING SCREENS ========== -->
+  <div id="onboarding" class="screen active">
+    <!-- Step 1: Welcome -->
+    <div id="onboard-welcome" class="onboard-step active">
+      <div class="onboard-content">
+        <div class="luna-logo-large">
+          <svg viewBox="0 0 120 120" class="crescent-large">
+            <defs>
+              <radialGradient id="moonGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#7BA7D4" stop-opacity="0.4"/>
+                <stop offset="100%" stop-color="#7BA7D4" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <circle cx="60" cy="60" r="55" fill="url(#moonGlow)" class="glow-circle"/>
+            <path d="M60 5 A55 55 0 1 1 60 115 A40 40 0 1 0 60 5" fill="#7BA7D4" class="crescent-path"/>
+          </svg>
+        </div>
+        <h1>Luna</h1>
+        <p class="tagline">Clap. Ask. Done.</p>
+        <p class="description">Your voice assistant that listens for a clap — no wake words, no buttons. Just clap and ask.</p>
+        <button class="btn-primary" onclick="Luna.onboarding.next()">Get Started</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Microphone Permission -->
+    <div id="onboard-mic" class="onboard-step">
+      <div class="onboard-content">
+        <div class="icon-circle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#7BA7D4" stroke-width="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </div>
+        <h2>Microphone Access</h2>
+        <p class="description">Luna needs your microphone to detect claps and hear your voice commands. Audio is processed locally — nothing is stored or sent unless you ask a question.</p>
+        <button class="btn-primary" onclick="Luna.onboarding.requestMic()">Allow Microphone</button>
+        <p class="privacy-note">🔒 Your privacy is our priority</p>
+      </div>
+    </div>
+
+    <!-- Step 3: Clap Calibration -->
+    <div id="onboard-calibrate" class="onboard-step">
+      <div class="onboard-content">
+        <div class="icon-circle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#7BA7D4" stroke-width="2">
+            <path d="M19 11a7 7 0 0 1-14 0"/>
+            <circle cx="12" cy="4" r="2"/>
+            <path d="M12 6v5"/>
+          </svg>
+        </div>
+        <h2>Clap Calibration</h2>
+        <p class="description">Clap <strong>3 times</strong> (one at a time) so Luna can learn your unique clap sound.</p>
+        <div class="calibration-dots">
+          <div class="cal-dot" id="cal-dot-1"></div>
+          <div class="cal-dot" id="cal-dot-2"></div>
+          <div class="cal-dot" id="cal-dot-3"></div>
+        </div>
+        <p class="cal-status" id="cal-status">Waiting for clap 1 of 3…</p>
+        <div class="volume-meter" id="cal-volume-meter">
+          <div class="volume-bar" id="cal-volume-bar"></div>
+        </div>
+        <button class="btn-secondary" id="cal-skip-btn" onclick="Luna.onboarding.skipCalibration()">Skip &amp; use defaults</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Tutorial -->
+    <div id="onboard-tutorial" class="onboard-step">
+      <div class="onboard-content">
+        <h2>How Luna Works</h2>
+        <div class="tutorial-cards">
+          <div class="tut-card">
+            <div class="tut-icon">👏</div>
+            <h3>1. Clap</h3>
+            <p>A single clap activates Luna. Double-clap for urgent mode.</p>
+          </div>
+          <div class="tut-card">
+            <div class="tut-icon">🗣️</div>
+            <h3>2. Ask</h3>
+            <p>Speak your command — set a timer, get the weather, open an app.</p>
+          </div>
+          <div class="tut-card">
+            <div class="tut-icon">✨</div>
+            <h3>3. Done</h3>
+            <p>Luna responds with verified answers and confidence indicators.</p>
+          </div>
+        </div>
+        <div class="example-commands">
+          <h3>Try saying:</h3>
+          <div class="cmd-pill">"What's the weather today?"</div>
+          <div class="cmd-pill">"Set a timer for 10 minutes"</div>
+          <div class="cmd-pill">"What's the capital of Mongolia?"</div>
+        </div>
+        <button class="btn-primary" onclick="Luna.onboarding.finish()">I'm Ready</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== MAIN APP (STANDBY) ========== -->
+  <div id="main-app" class="screen">
+    <!-- Standby State -->
+    <div id="standby" class="app-state active">
+      <div class="standby-content">
+        <div class="luna-logo-standby">
+          <svg viewBox="0 0 120 120" class="crescent-standby">
+            <defs>
+              <radialGradient id="moonGlowStandby" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#7BA7D4" stop-opacity="0.15"/>
+                <stop offset="100%" stop-color="#7BA7D4" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <circle cx="60" cy="60" r="55" fill="url(#moonGlowStandby)" class="glow-circle"/>
+            <path d="M60 5 A55 55 0 1 1 60 115 A40 40 0 1 0 60 5" fill="#7BA7D4" opacity="0.3" class="crescent-path"/>
+          </svg>
+        </div>
+        <p class="standby-text">Clap to start</p>
+        <div class="volume-meter standby-meter" id="standby-volume-meter">
+          <div class="volume-bar" id="standby-volume-bar"></div>
+        </div>
+        <div class="standby-status">
+          <span class="status-dot"></span>
+          <span id="standby-status-text">Listening for claps…</span>
+        </div>
+      </div>
+
+      <!-- Query History -->
+      <div class="history-section" id="history-section">
+        <h3>Recent Queries</h3>
+        <div id="history-list" class="history-list"></div>
+      </div>
+
+      <!-- Settings toggle -->
+      <button class="settings-btn" onclick="Luna.ui.toggleSettings()" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- ========== LISTENING OVERLAY ========== -->
+    <div id="listening-overlay" class="app-state">
+      <div class="overlay-backdrop"></div>
+      <div class="overlay-content">
+        <div class="luna-ring" id="luna-ring">
+          <svg viewBox="0 0 200 200" class="ring-svg">
+            <defs>
+              <radialGradient id="ringGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#7BA7D4" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#7BA7D4" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <circle cx="100" cy="100" r="90" fill="url(#ringGlow)" class="ring-glow"/>
+            <circle cx="100" cy="100" r="60" fill="none" stroke="#7BA7D4" stroke-width="2" class="ring-outer" opacity="0.5"/>
+            <circle cx="100" cy="100" r="45" fill="none" stroke="#7BA7D4" stroke-width="1.5" class="ring-inner" opacity="0.3"/>
+            <path d="M100 15 A85 85 0 1 1 100 185 A60 60 0 1 0 100 15" fill="#7BA7D4" opacity="0.6" class="ring-crescent"/>
+          </svg>
+          <!-- Audio visualization bars -->
+          <div class="audio-viz" id="audio-viz">
+            <div class="viz-bar"></div><div class="viz-bar"></div><div class="viz-bar"></div>
+            <div class="viz-bar"></div><div class="viz-bar"></div><div class="viz-bar"></div>
+            <div class="viz-bar"></div><div class="viz-bar"></div><div class="viz-bar"></div>
+          </div>
+        </div>
+        <p class="overlay-status" id="overlay-status">Listening…</p>
+        <p class="overlay-transcript" id="overlay-transcript"></p>
+
+        <!-- Response area -->
+        <div class="response-area" id="response-area" style="display:none;">
+          <div class="confidence-badge" id="confidence-badge">
+            <span class="conf-icon" id="conf-icon"></span>
+            <span class="conf-text" id="conf-text"></span>
+          </div>
+          <p class="response-text" id="response-text"></p>
+          <p class="response-source" id="response-source"></p>
+        </div>
+
+        <!-- Timer display -->
+        <div class="timer-display" id="timer-display" style="display:none;">
+          <p class="timer-value" id="timer-value"></p>
+          <button class="btn-secondary btn-small" onclick="Luna.timer.cancel()">Cancel Timer</button>
+        </div>
+
+        <button class="btn-dismiss" onclick="Luna.ui.dismiss()">Dismiss</button>
+      </div>
+    </div>
+
+    <!-- ========== URGENT MODE OVERLAY ========== -->
+    <div id="urgent-overlay" class="app-state">
+      <div class="overlay-backdrop urgent-backdrop"></div>
+      <div class="overlay-content">
+        <div class="urgent-icon">🚨</div>
+        <h2 class="urgent-title">Urgent Mode</h2>
+        <p class="urgent-desc">Double-clap detected. Speak your urgent command.</p>
+        <div class="luna-ring urgent-ring" id="urgent-ring">
+          <div class="audio-viz" id="urgent-audio-viz">
+            <div class="viz-bar urgent-bar"></div><div class="viz-bar urgent-bar"></div><div class="viz-bar urgent-bar"></div>
+            <div class="viz-bar urgent-bar"></div><div class="viz-bar urgent-bar"></div>
+          </div>
+        </div>
+        <p class="overlay-status" id="urgent-status">Listening…</p>
+        <p class="overlay-transcript" id="urgent-transcript"></p>
+        <button class="btn-dismiss" onclick="Luna.ui.dismiss()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- ========== SETTINGS PANEL ========== -->
+    <div id="settings-panel" class="settings-panel">
+      <div class="settings-header">
+        <h2>Settings</h2>
+        <button class="close-btn" onclick="Luna.ui.toggleSettings()">✕</button>
+      </div>
+      <div class="settings-body">
+        <div class="setting-group">
+          <h3>Clap Detection</h3>
+          <label class="setting-row">
+            <span>Sensitivity</span>
+            <input type="range" min="1" max="10" value="5" id="sensitivity-slider" oninput="Luna.settings.setSensitivity(this.value)"/>
+            <span class="setting-value" id="sensitivity-value">5</span>
+          </label>
+          <label class="setting-row">
+            <span>Double-clap timeout (ms)</span>
+            <input type="range" min="200" max="800" value="400" step="50" id="dblclap-slider" oninput="Luna.settings.setDoubleClap(this.value)"/>
+            <span class="setting-value" id="dblclap-value">400ms</span>
+          </label>
+        </div>
+        <div class="setting-group">
+          <h3>Audio</h3>
+          <label class="setting-row">
+            <span>Entry chime</span>
+            <select id="chime-select" onchange="Luna.settings.setChime(this.value)">
+              <option value="soft">Soft Tone</option>
+              <option value="bell">Bell</option>
+              <option value="click">Click</option>
+              <option value="none">None</option>
+            </select>
+          </label>
+          <label class="setting-row">
+            <span>Voice</span>
+            <select id="voice-select" onchange="Luna.settings.setVoice(this.value)"></select>
+          </label>
+          <label class="setting-row">
+            <span>Speech rate</span>
+            <input type="range" min="0.5" max="2" value="1" step="0.1" id="rate-slider" oninput="Luna.settings.setRate(this.value)"/>
+            <span class="setting-value" id="rate-value">1.0x</span>
+          </label>
+        </div>
+        <div class="setting-group">
+          <h3>Privacy</h3>
+          <label class="setting-row">
+            <span>Show query log</span>
+            <input type="checkbox" checked id="log-toggle" onchange="Luna.settings.toggleLog(this.checked)"/>
+          </label>
+        </div>
+        <div class="setting-group">
+          <h3>About</h3>
+          <p class="about-text">Luna v1.0 — Clap. Ask. Done.<br>Built with Web Audio API, Web Speech API, and verified knowledge sources.</p>
+        </div>
+        <button class="btn-secondary" onclick="Luna.onboarding.recalibrate()">Re-calibrate Clap</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== AUDIO ELEMENTS ========== -->
+  <!-- We'll generate chimes programmatically with Web Audio API -->
+
+  <script src="app.js"></script>
+</body>
+</html>
