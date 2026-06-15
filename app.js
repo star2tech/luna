@@ -667,7 +667,7 @@ const Luna = (() => {
         }
 
         speech.showResponse(query, response);
-        speech.speak(response.text);
+        speech.speak(response.text, true);
 
         // Add to history
         state.history.unshift({
@@ -693,6 +693,8 @@ const Luna = (() => {
       const responseSource = document.getElementById('response-source');
 
       if (!responseArea) return;
+
+      responseArea.classList.remove('faded');
 
       // Set confidence
       badge.className = 'confidence-badge ' + response.confidence;
@@ -721,7 +723,7 @@ const Luna = (() => {
       }
     },
 
-    speak(text) {
+    speak(text, autoRelisten) {
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = speechSynthesis.getVoices();
       if (voices.length > state.voiceIndex) {
@@ -730,7 +732,29 @@ const Luna = (() => {
       utterance.rate = state.speechRate;
       utterance.pitch = 1.0;
       utterance.volume = 0.8;
+
+      if (autoRelisten !== false) {
+        utterance.onend = () => {
+          if (state.phase === 'listening' || state.phase === 'urgent') {
+            speech.resumeListening();
+          }
+        };
+      }
+
       speechSynthesis.speak(utterance);
+    },
+
+    resumeListening() {
+      const statusEl = document.getElementById('overlay-status');
+      const transcriptEl = document.getElementById('overlay-transcript');
+      if (statusEl) statusEl.textContent = 'Listening…';
+      if (transcriptEl) transcriptEl.textContent = '';
+
+      const responseArea = document.getElementById('response-area');
+      if (responseArea) responseArea.classList.add('faded');
+
+      audio.playChime('click');
+      speech.startListening();
     },
   };
 
@@ -769,7 +793,7 @@ const Luna = (() => {
       if (this.interval) clearInterval(this.interval);
       this.interval = null;
       audio.playTimerDone();
-      speech.speak('Timer is done!');
+      speech.speak('Timer is done!', false);
       const el = document.getElementById('timer-value');
       if (el) el.textContent = 'Done!';
       setTimeout(() => {
@@ -783,7 +807,7 @@ const Luna = (() => {
       this.interval = null;
       const display = document.getElementById('timer-display');
       if (display) display.style.display = 'none';
-      speech.speak('Timer cancelled.');
+      speech.speak('Timer cancelled.', false);
     },
   };
 
