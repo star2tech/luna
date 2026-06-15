@@ -39,6 +39,9 @@ const Luna = (() => {
     calibrationClaps: 0,
     isCalibrating: false,
     isProcessingClap: false,
+    wakeWordRecognition: null,
+    isWakeWordListening: false,
+    wakeWordEnabled: true,
   };
 
   // ===== KNOWLEDGE DATABASE =====
@@ -538,6 +541,74 @@ const Luna = (() => {
     },
   };
 
+  // ===== WAKE WORD DETECTOR =====
+  const wakeWord = {
+    phrases: ['hey luna', 'a luna', 'hey loona', 'hey luma', 'eluna', 'hey leuna'],
+
+    init() {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return;
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      state.wakeWordRecognition = new SpeechRecognition();
+      state.wakeWordRecognition.continuous = true;
+      state.wakeWordRecognition.interimResults = true;
+      state.wakeWordRecognition.lang = 'en-US';
+
+      state.wakeWordRecognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript.toLowerCase().trim();
+          if (wakeWord.matches(transcript)) {
+            wakeWord.stop();
+            Luna.ui.showListening();
+            return;
+          }
+        }
+      };
+
+      state.wakeWordRecognition.onerror = (event) => {
+        if (event.error === 'no-speech' || event.error === 'aborted') {
+          // Restart silently
+          if (state.phase === 'standby' && state.wakeWordEnabled) {
+            setTimeout(() => wakeWord.start(), 300);
+          }
+        }
+      };
+
+      state.wakeWordRecognition.onend = () => {
+        state.isWakeWordListening = false;
+        // Auto-restart if still in standby
+        if (state.phase === 'standby' && state.wakeWordEnabled) {
+          setTimeout(() => wakeWord.start(), 300);
+        }
+      };
+    },
+
+    matches(transcript) {
+      for (const phrase of wakeWord.phrases) {
+        if (transcript.includes(phrase)) return true;
+      }
+      // Also match just "luna" if it's the only word
+      if (transcript === 'luna' || transcript === 'loona') return true;
+      return false;
+    },
+
+    start() {
+      if (!state.wakeWordRecognition || state.isWakeWordListening || !state.wakeWordEnabled) return;
+      try {
+        state.wakeWordRecognition.start();
+        state.isWakeWordListening = true;
+      } catch (e) {
+        // Already started or other error
+      }
+    },
+
+    stop() {
+      if (state.wakeWordRecognition && state.isWakeWordListening) {
+        try { state.wakeWordRecognition.stop(); } catch (e) { /* ignore */ }
+        state.isWakeWordListening = false;
+      }
+    },
+  };
+
   // ===== SPEECH ENGINE =====
   const speech = {
     init() {
@@ -827,6 +898,7 @@ const Luna = (() => {
 
     showListening() {
       state.phase = 'listening';
+      wakeWord.stop();
       ui.showState('listening-overlay');
       const statusEl = document.getElementById('overlay-status');
       const transcriptEl = document.getElementById('overlay-transcript');
@@ -843,6 +915,7 @@ const Luna = (() => {
 
     showUrgent() {
       state.phase = 'urgent';
+      wakeWord.stop();
       ui.showState('urgent-overlay');
       const statusEl = document.getElementById('urgent-status');
       const transcriptEl = document.getElementById('urgent-transcript');
@@ -858,6 +931,8 @@ const Luna = (() => {
       speechSynthesis.cancel();
       state.phase = 'standby';
       ui.showState('standby');
+      // Resume wake word listening in standby
+      setTimeout(() => wakeWord.start(), 500);
     },
 
     toggleSettings() {
@@ -941,6 +1016,8 @@ const Luna = (() => {
       ui.showScreen('main-app');
       ui.showState('standby');
       if (!clapDetector.running) clapDetector.start();
+      wakeWord.init();
+      wakeWord.start();
     },
 
     recalibrate() {
@@ -993,6 +1070,21 @@ const Luna = (() => {
       state.showLog = checked;
       ui.updateHistory();
     },
+
+    toggleWakeWord(checked) {
+      state.wakeWordEnabled = checked;
+      if (checked && state.phase === 'standby') {
+        wakeWord.start();
+      } else {
+        wakeWord.stop();
+      }
+      const statusText = document.getElementById('standby-status-text');
+      if (statusText) {
+        statusText.textContent = checked
+          ? 'Listening for claps & voice\u2026'
+          : 'Listening for claps\u2026';
+      }
+    },
   };
 
   // ===== PUBLIC API =====
@@ -1002,6 +1094,7 @@ const Luna = (() => {
     timer,
     settings,
     audio,
+    wakeWord,
     state,
   };
 })();

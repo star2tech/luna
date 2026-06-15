@@ -87,7 +87,7 @@
           <div class="tut-card">
             <div class="tut-icon">👏</div>
             <h3>1. Clap</h3>
-            <p>A single clap activates Luna. Double-clap for urgent mode.</p>
+            <p>A single clap or say "Hey Luna" to activate. Double-clap for urgent mode.</p>
           </div>
           <div class="tut-card">
             <div class="tut-icon">🗣️</div>
@@ -128,13 +128,13 @@
             <path d="M60 5 A55 55 0 1 1 60 115 A40 40 0 1 0 60 5" fill="#7BA7D4" opacity="0.3" class="crescent-path"/>
           </svg>
         </div>
-        <p class="standby-text">Clap to start</p>
+        <p class="standby-text">Clap or say "Hey Luna" to start</p>
         <div class="volume-meter standby-meter" id="standby-volume-meter">
           <div class="volume-bar" id="standby-volume-bar"></div>
         </div>
         <div class="standby-status">
           <span class="status-dot"></span>
-          <span id="standby-status-text">Listening for claps…</span>
+          <span id="standby-status-text">Listening for claps &amp; voice…</span>
         </div>
       </div>
 
@@ -258,6 +258,13 @@
             <span>Speech rate</span>
             <input type="range" min="0.5" max="2" value="1" step="0.1" id="rate-slider" oninput="Luna.settings.setRate(this.value)"/>
             <span class="setting-value" id="rate-value">1.0x</span>
+          </label>
+        </div>
+        <div class="setting-group">
+          <h3>Activation</h3>
+          <label class="setting-row">
+            <span>"Hey Luna" wake word</span>
+            <input type="checkbox" checked id="wakeword-toggle" onchange="Luna.settings.toggleWakeWord(this.checked)"/>
           </label>
         </div>
         <div class="setting-group">
