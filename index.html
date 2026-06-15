@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Luna — Clap. Ask. Done.</title>
   <link rel="stylesheet" href="styles.css" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; media-src 'self'; script-src 'self' 'unsafe-inline'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; media-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://generativelanguage.googleapis.com" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -299,6 +299,24 @@
           </label>
         </div>
         <div class="setting-group">
+          <h3>AI Assistant</h3>
+          <label class="setting-row api-key-row">
+            <span>Gemini API Key</span>
+            <div class="api-key-input-wrap">
+              <input type="password" id="gemini-key-input" placeholder="Paste your API key…" oninput="Luna.settings.setGeminiKey(this.value)"/>
+              <button class="btn-toggle-vis" onclick="const i=document.getElementById('gemini-key-input');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'" title="Toggle visibility">👁</button>
+            </div>
+          </label>
+          <div class="setting-hint">
+            <span id="gemini-status" class="gemini-status">Not set</span>
+            · <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get free API key</a>
+          </div>
+          <label class="setting-row">
+            <span>AI-powered answers</span>
+            <input type="checkbox" checked id="ai-toggle" onchange="Luna.settings.toggleAI(this.checked)"/>
+          </label>
+        </div>
+        <div class="setting-group">
           <h3>Activation</h3>
           <label class="setting-row">
             <span>"Hey Luna" wake word</span>
@@ -314,7 +332,7 @@
         </div>
         <div class="setting-group">
           <h3>About</h3>
-          <p class="about-text">Luna v1.0 — Clap. Ask. Done.<br>Built with Web Audio API, Web Speech API, and verified knowledge sources.</p>
+          <p class="about-text">Luna v2.0 — Clap. Ask. Done.<br>Built with Web Audio API, Web Speech API, Google Gemini AI, and verified knowledge sources.</p>
         </div>
         <button class="btn-secondary" onclick="Luna.onboarding.recalibrate()">Re-calibrate Clap</button>
       </div>

@@ -42,6 +42,8 @@ const Luna = (() => {
     wakeWordRecognition: null,
     isWakeWordListening: false,
     wakeWordEnabled: true,
+    geminiApiKey: localStorage.getItem('luna_gemini_key') || '',
+    useAI: true,
     speechAvailable: false,
     isElectron: !!(window.electronAPI || (typeof process !== 'undefined' && process.versions && process.versions.electron)),
   };
@@ -281,6 +283,110 @@ const Luna = (() => {
           source: 'Tip: Try asking "What\'s the weather today?" or "What\'s the capital of France?"',
         };
       },
+    },
+  };
+
+  // ===== GEMINI AI =====
+  const gemini = {
+    async ask(query) {
+      if (!state.geminiApiKey) {
+        return null;
+      }
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${state.geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: `You are Luna, a friendly and helpful voice assistant. Keep responses concise (2-3 sentences max) and conversational — they will be read aloud. Do not use markdown formatting. If asked to open an app, just confirm you'll open it.\n\nUser: ${query}` }]
+              }],
+              generationConfig: {
+                maxOutputTokens: 150,
+                temperature: 0.7,
+              },
+            }),
+          }
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.warn('Gemini API error:', res.status, err);
+          return null;
+        }
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          return {
+            text: text.trim(),
+            confidence: 'high',
+            source: 'Source: Google Gemini AI',
+          };
+        }
+        return null;
+      } catch (e) {
+        console.warn('Gemini request failed:', e);
+        return null;
+      }
+    },
+  };
+
+  // ===== APP LAUNCHER =====
+  const appLauncher = {
+    patterns: [/open\s+(.+)/i, /launch\s+(.+)/i, /start\s+(.+)/i, /run\s+(.+)/i],
+
+    appAliases: {
+      'notion': { win: 'Notion.exe', mac: 'Notion', linux: 'notion-app' },
+      'vs code': { win: 'Code.exe', mac: 'Visual Studio Code', linux: 'code' },
+      'vscode': { win: 'Code.exe', mac: 'Visual Studio Code', linux: 'code' },
+      'visual studio code': { win: 'Code.exe', mac: 'Visual Studio Code', linux: 'code' },
+      'chrome': { win: 'chrome.exe', mac: 'Google Chrome', linux: 'google-chrome' },
+      'google chrome': { win: 'chrome.exe', mac: 'Google Chrome', linux: 'google-chrome' },
+      'firefox': { win: 'firefox.exe', mac: 'Firefox', linux: 'firefox' },
+      'safari': { win: null, mac: 'Safari', linux: null },
+      'terminal': { win: 'cmd.exe', mac: 'Terminal', linux: 'gnome-terminal' },
+      'spotify': { win: 'Spotify.exe', mac: 'Spotify', linux: 'spotify' },
+      'slack': { win: 'slack.exe', mac: 'Slack', linux: 'slack' },
+      'discord': { win: 'Discord.exe', mac: 'Discord', linux: 'discord' },
+      'finder': { win: 'explorer.exe', mac: 'Finder', linux: 'nautilus' },
+      'file explorer': { win: 'explorer.exe', mac: 'Finder', linux: 'nautilus' },
+      'files': { win: 'explorer.exe', mac: 'Finder', linux: 'nautilus' },
+      'calculator': { win: 'calc.exe', mac: 'Calculator', linux: 'gnome-calculator' },
+      'notepad': { win: 'notepad.exe', mac: 'TextEdit', linux: 'gedit' },
+      'settings': { win: 'ms-settings:', mac: 'System Preferences', linux: 'gnome-control-center' },
+      'teams': { win: 'Teams.exe', mac: 'Microsoft Teams', linux: 'teams' },
+      'zoom': { win: 'Zoom.exe', mac: 'zoom.us', linux: 'zoom' },
+      'obs': { win: 'obs64.exe', mac: 'OBS', linux: 'obs' },
+      'figma': { win: 'Figma.exe', mac: 'Figma', linux: 'figma-linux' },
+      'postman': { win: 'Postman.exe', mac: 'Postman', linux: 'postman' },
+      'word': { win: 'WINWORD.exe', mac: 'Microsoft Word', linux: 'libreoffice --writer' },
+      'excel': { win: 'EXCEL.exe', mac: 'Microsoft Excel', linux: 'libreoffice --calc' },
+      'powerpoint': { win: 'POWERPNT.exe', mac: 'Microsoft PowerPoint', linux: 'libreoffice --impress' },
+    },
+
+    match(query) {
+      for (const pattern of this.patterns) {
+        const m = query.match(pattern);
+        if (m) return m[1].trim().toLowerCase();
+      }
+      return null;
+    },
+
+    async launch(appName) {
+      if (!window.electronAPI || !window.electronAPI.launchApp) {
+        return { text: `I'd open ${appName} for you, but app launching only works in the desktop app. Try the Electron version!`, confidence: 'medium', source: '' };
+      }
+      const alias = this.appAliases[appName];
+      const target = alias || appName;
+      try {
+        const result = await window.electronAPI.launchApp(typeof target === 'object' ? target : appName);
+        if (result.success) {
+          return { text: `Opening ${appName} for you!`, confidence: 'high', source: '' };
+        }
+        return { text: `I tried to open ${appName} but it doesn't seem to be installed. Check the app name and try again.`, confidence: 'low', source: '' };
+      } catch (e) {
+        return { text: `Sorry, I couldn't open ${appName}. It might not be installed.`, confidence: 'low', source: '' };
+      }
     },
   };
 
@@ -885,7 +991,7 @@ const Luna = (() => {
       }
     },
 
-    processQuery(query) {
+    async processQuery(query) {
       if (state.autoDismissTimer) clearTimeout(state.autoDismissTimer);
 
       const statusEl = state.phase === 'urgent'
@@ -895,36 +1001,77 @@ const Luna = (() => {
 
       audio.playThinking();
 
-      // Search knowledge database
-      setTimeout(() => {
-        let response = null;
-        for (const [key, category] of Object.entries(knowledgeDB)) {
-          if (key === 'general') continue;
-          for (const pattern of category.patterns) {
-            if (pattern.test(query)) {
-              response = category.handler(query);
-              break;
-            }
-          }
-          if (response) break;
-        }
-        if (!response) {
-          response = knowledgeDB.general.handler(query);
-        }
-
+      // Check if user wants to open an app
+      const appName = appLauncher.match(query);
+      if (appName) {
+        const response = await appLauncher.launch(appName);
         speech.showResponse(query, response);
         speech.speak(response.text, true);
+        speech._addToHistory(query, response);
+        return;
+      }
 
-        // Add to history
-        state.history.unshift({
-          query,
-          answer: response.text,
-          confidence: response.confidence,
-          time: new Date(),
-        });
-        if (state.history.length > 20) state.history.pop();
-        ui.updateHistory();
-      }, 600);
+      // Search local knowledge database first (instant, no API call)
+      let response = null;
+      for (const [key, category] of Object.entries(knowledgeDB)) {
+        if (key === 'general') continue;
+        for (const pattern of category.patterns) {
+          if (pattern.test(query)) {
+            response = category.handler(query);
+            break;
+          }
+        }
+        if (response) break;
+      }
+
+      // If local KB matched, use it
+      if (response) {
+        speech.showResponse(query, response);
+        speech.speak(response.text, true);
+        speech._addToHistory(query, response);
+        return;
+      }
+
+      // Check general knowledge (greetings, identity, hardcoded facts)
+      const generalResponse = knowledgeDB.general.handler(query);
+      if (generalResponse.confidence !== 'low') {
+        speech.showResponse(query, generalResponse);
+        speech.speak(generalResponse.text, true);
+        speech._addToHistory(query, generalResponse);
+        return;
+      }
+
+      // Fall back to Gemini AI
+      if (state.useAI && state.geminiApiKey) {
+        if (statusEl) statusEl.textContent = 'Thinking…';
+        const aiResponse = await gemini.ask(query);
+        if (aiResponse) {
+          speech.showResponse(query, aiResponse);
+          speech.speak(aiResponse.text, true);
+          speech._addToHistory(query, aiResponse);
+          return;
+        }
+      }
+
+      // Final fallback — no API key or Gemini failed
+      if (!state.geminiApiKey) {
+        generalResponse.text = "I'm not sure about that. Add a Gemini API key in Settings to unlock AI-powered answers for any question!";
+        generalResponse.source = 'Tip: Get a free API key at ai.google.dev';
+      }
+      speech.showResponse(query, generalResponse);
+      speech.speak(generalResponse.text, true);
+      speech._addToHistory(query, generalResponse);
+    },
+
+    _addToHistory(query, response) {
+      state.history.unshift({
+        query,
+        answer: response.text,
+        confidence: response.confidence,
+        time: new Date(),
+      });
+      if (state.history.length > 20) state.history.pop();
+      ui.updateHistory();
     },
 
     showResponse(query, response) {
@@ -1114,7 +1261,21 @@ const Luna = (() => {
 
     toggleSettings() {
       const panel = document.getElementById('settings-panel');
-      if (panel) panel.classList.toggle('open');
+      if (panel) {
+        panel.classList.toggle('open');
+        // Populate saved API key into input
+        if (panel.classList.contains('open')) {
+          const keyInput = document.getElementById('gemini-key-input');
+          if (keyInput && state.geminiApiKey) {
+            keyInput.value = state.geminiApiKey;
+          }
+          const statusEl = document.getElementById('gemini-status');
+          if (statusEl) {
+            statusEl.textContent = state.geminiApiKey ? 'Connected' : 'Not set';
+            statusEl.className = 'gemini-status ' + (state.geminiApiKey ? 'connected' : '');
+          }
+        }
+      }
     },
 
     submitTextQuery(event) {
@@ -1290,6 +1451,20 @@ const Luna = (() => {
       ui.updateHistory();
     },
 
+    setGeminiKey(val) {
+      state.geminiApiKey = val.trim();
+      localStorage.setItem('luna_gemini_key', state.geminiApiKey);
+      const statusEl = document.getElementById('gemini-status');
+      if (statusEl) {
+        statusEl.textContent = state.geminiApiKey ? 'Connected' : 'Not set';
+        statusEl.className = 'gemini-status ' + (state.geminiApiKey ? 'connected' : '');
+      }
+    },
+
+    toggleAI(checked) {
+      state.useAI = checked;
+    },
+
     toggleWakeWord(checked) {
       state.wakeWordEnabled = checked;
       if (checked && state.phase === 'standby') {
@@ -1315,5 +1490,7 @@ const Luna = (() => {
     audio,
     wakeWord,
     state,
+    gemini,
+    appLauncher,
   };
 })();
